@@ -1,0 +1,35 @@
+{
+  "name": "opencode-native-goal-tools",
+  "version": "0.1.0",
+  "description": "Agent tools for OpenCode's native session goals",
+  "license": "MIT",
+  "author": "Mikhail Belyakov",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ex10se/opencode-native-goal-tools.git"
+  },
+  "homepage": "https://github.com/ex10se/opencode-native-goal-tools#readme",
+  "bugs": {
+    "url": "https://github.com/ex10se/opencode-native-goal-tools/issues"
+  },
+  "keywords": ["opencode", "plugin", "goal", "agent-tools", "native-goal"],
+  "type": "module",
+  "engines": { "node": ">=22.18.0" },
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "files": ["dist", "LICENSE", "README.md", "README.ru.md", "CHANGELOG.md", "CONTRIBUTING.md", "SECURITY.md", "docs"],
+  "scripts": {
+    "test": "node --experimental-strip-types --test test/*.test.ts",
+    "test:smoke": "node test/smoke.mjs",
+    "test:package": "node test/package.mjs",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc",
+    "prepack": "npm run typecheck && npm run build"
+  },
+  "overrides": { "glob": "14.0.3", "minimatch": "11.0.4" },
+  "devDependencies": {
+    "@opencode/plugin": "2.3.0",
+    "@opencode/schema": "2.3.0",
+    "@types/node": "22.19.0",
+    "typescript": "5.9.3"
+  }
+}
