@@ -18,7 +18,8 @@
   "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
   "files": ["dist", "LICENSE", "README.md", "README.ru.md", "CHANGELOG.md", "CONTRIBUTING.md", "SECURITY.md", "docs"],
   "scripts": {
-    "test": "node --experimental-strip-types --test test/*.test.ts",
+    "test": "node --experimental-strip-types --test test/*.test.ts test/*.test.mjs",
+    "audit:policy": "node scripts/audit.mjs",
     "test:smoke": "node test/smoke.mjs",
     "test:package": "node test/package.mjs",
     "typecheck": "tsc --noEmit",

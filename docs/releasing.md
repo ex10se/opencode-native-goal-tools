@@ -10,6 +10,19 @@ The initial version is 0.1.0. These instructions describe a manual release; the 
 4. Inspect both READMEs, the package file list, and the license
 5. Verify hosted CI for the release commit before publishing
 
+The release temporarily accepts only the development-only picomatch advisory
+[GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf),
+under the [Security policy](../SECURITY.md#temporary-development-dependency-risk-acceptance),
+until **2026-12-17 00:00 UTC**. Run `npm run audit:policy` and inspect the full
+report and warning; a passing gate does not mean zero vulnerabilities.
+Other moderate-or-higher findings, runtime exposure, unknown/mixed causes
+and audit failures block release. Remove the exception when a supported
+patched tree is verified, updating Security, Verification and Releasing
+together. A still-required exception blocks at expiry; a clean or low-only
+report instead passes with a removal notice. Do not renew it automatically.
+The separately installed OpenCode smoke host has its own dependency tree;
+this package's audit does not establish that host's security
+
 The repository already exists. Its visibility, pushed release commit, and npm publication must be verified separately; a dated changelog is not proof of publication. Installation instructions cover source checkouts and local archives, with registry installation conditional on publication.
 
 ## Build the archive
