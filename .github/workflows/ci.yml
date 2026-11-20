@@ -24,12 +24,10 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
-      - name: Full public npm audit report (including development dependencies)
-        run: node scripts/audit.mjs capture "$RUNNER_TEMP/npm-audit.json"
-      - name: Enforce moderate audit threshold with bounded advisory exception
-        run: node scripts/audit.mjs check "$RUNNER_TEMP/npm-audit.json"
+      - name: Full public npm audit (including development dependencies)
+        run: npm run audit:policy
       - run: npm pack --dry-run
       - name: Install isolated smoke host
-        run: npm install --prefix "$RUNNER_TEMP/goal-host" @opencode/cli@2.3.0
+        run: npm install --prefix "$RUNNER_TEMP/goal-host" @opencode/cli@latest
       - name: Packed package and native Goal lifecycle smoke
         run: npm run test:package -- "$RUNNER_TEMP/goal-host/node_modules/.bin/opencode"

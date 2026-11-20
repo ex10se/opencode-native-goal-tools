@@ -34,6 +34,19 @@ function readGoal(value: unknown): Goal | null {
 export default {
   id: "local.native-goal-tools",
   async setup(ctx) {
+    // Presentation only: the marker scopes this hook, never authorizes a request.
+    // Register after policy plugins so their final ask reason is preserved.
+    await ctx.permission.hook("evaluate", (event) => {
+      if (event.effect !== "ask" || event.action !== "goal" ||
+          event.source?.type !== "tool" ||
+          event.metadata?.["local.native-goal-tools"] !== true ||
+          event.resources.length !== 1) return;
+      const operation = event.resources[0];
+      if (operation !== "create" && operation !== "replace") return;
+      const line = `Operation: ${operation}`;
+      if (event.message?.split(/\r?\n/).includes(line)) return;
+      event.message = event.message ? `${event.message}\n${line}` : line;
+    });
     const rpc = ctx.rpc(nativeGoal);
     const tools = createGoalTools({
       async get(sessionID) { return readGoal(await rpc.get({ sessionID })); },
@@ -61,7 +74,7 @@ export default {
       });
       editor.add({
         name: "create_goal",
-        description: "Create this session's native OpenCode Goal only when the user explicitly requests it. Read get_goal first. Never replaces an existing goal or resumes a paused goal. Unavailable in Plan. Returns verified native state; do not retry errors automatically.",
+        description: "Create this session's native OpenCode Goal only when the user explicitly requests it. Read get_goal first. Never replaces an existing goal or resumes a paused goal. Subject to host permissions in every mode, including Plan. Returns verified native state; do not retry errors automatically.",
         input: {
           type: "object",
           properties: { objective: { type: "string", minLength: 1, description: "Complete objective and acceptance criteria; native limit is 4000 UTF-16 units." } },
@@ -70,13 +83,13 @@ export default {
         },
         options: { codemode: false },
         async execute(input, context) {
-          if (context.agent.toLowerCase() === "plan") throw new Error("Goal creation is unavailable in Plan mode.");
           await ctx.permission.assert({
             sessionID: context.sessionID,
             agent: context.agent,
             source: { type: "tool", messageID: context.messageID, id: context.id },
             action: "goal",
             resources: ["create"],
+            metadata: { "local.native-goal-tools": true },
           });
           const { objective } = input as { objective: string };
           return { content: JSON.stringify(await tools.create(context.sessionID, context.agent, objective)) };
@@ -84,7 +97,7 @@ export default {
       });
       editor.add({
         name: "replace_goal",
-        description: "Replace this session's native OpenCode Goal only when the user explicitly asks to correct, change, or replace it. Read get_goal first and pass its exact id as expected_goal_id. Replaces active, paused, or completed goals with a new active goal and a new ID; this is not an in-place edit. Unavailable in Plan. Never retry automatically after an error.",
+        description: "Replace this session's native OpenCode Goal only when the user explicitly asks to correct, change, or replace it. Read get_goal first and pass its exact id as expected_goal_id. Replaces active, paused, or completed goals with a new active goal and a new ID; this is not an in-place edit. Subject to host permissions in every mode, including Plan. Never retry automatically after an error.",
         input: {
           type: "object",
           properties: {
@@ -96,13 +109,13 @@ export default {
         },
         options: { codemode: false },
         async execute(input, context) {
-          if (context.agent.toLowerCase() === "plan") throw new Error("Goal replacement is unavailable in Plan mode.");
           await ctx.permission.assert({
             sessionID: context.sessionID,
             agent: context.agent,
             source: { type: "tool", messageID: context.messageID, id: context.id },
             action: "goal",
             resources: ["replace"],
+            metadata: { "local.native-goal-tools": true },
           });
           const { objective, expected_goal_id } = input as { objective: string; expected_goal_id: string };
           return { content: JSON.stringify(await tools.replace(context.sessionID, context.agent, expected_goal_id, objective)) };

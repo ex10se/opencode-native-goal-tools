@@ -4,24 +4,25 @@ The initial version is 0.1.0. These instructions describe a manual release; the 
 
 ## Prepare
 
+Use the latest stable OpenCode release for every release check. Refresh the
+OpenCode SDK development dependencies with the following command, and commit
+the resulting manifest and lockfile after verification. The smoke test checks
+its executable against the current public registry version.
+
+```sh
+npm install --save-dev --save-exact --ignore-scripts @opencode/plugin@latest @opencode/schema@latest
+```
+
 1. Verify [the repository](https://github.com/ex10se/opencode-native-goal-tools) is public and the manifest's `repository`, `homepage`, and `bugs` URLs point to it
 2. Update the version in the manifest, lockfile, and changelog together
 3. Run the checks in [Verification](verification.md) on the release commit
 4. Inspect both READMEs, the package file list, and the license
 5. Verify hosted CI for the release commit before publishing
 
-The release temporarily accepts only the development-only picomatch advisory
-[GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf),
-under the [Security policy](../SECURITY.md#temporary-development-dependency-risk-acceptance),
-until **2026-12-17 00:00 UTC**. Run `npm run audit:policy` and inspect the full
-report and warning; a passing gate does not mean zero vulnerabilities.
-Other moderate-or-higher findings, runtime exposure, unknown/mixed causes
-and audit failures block release. Remove the exception when a supported
-patched tree is verified, updating Security, Verification and Releasing
-together. A still-required exception blocks at expiry; a clean or low-only
-report instead passes with a removal notice. Do not renew it automatically.
+Run `npm run audit:policy`: this is the full public-registry audit with no
+exceptions. Moderate-or-higher findings and audit errors block release.
 The separately installed OpenCode smoke host has its own dependency tree;
-this package's audit does not establish that host's security
+this package's audit does not establish that host's security.
 
 The repository already exists. Its visibility, pushed release commit, and npm publication must be verified separately; a dated changelog is not proof of publication. Installation instructions cover source checkouts and local archives, with registry installation conditional on publication.
 
@@ -46,7 +47,7 @@ Install the exact archive in a separate empty directory:
 npm install --ignore-scripts /absolute/path/to/opencode-native-goal-tools-0.1.0.tgz
 ```
 
-In an isolated OpenCode configuration, point `plugins` to the installed directory ending in `node_modules/opencode-native-goal-tools`. Check tool availability, native state, Plan refusal, and lifecycle controls. Keep the tested archive unchanged for publication.
+In an isolated OpenCode configuration, point `plugins` to the installed directory ending in `node_modules/opencode-native-goal-tools`. Check tool availability, native state, Plan creation/readback/replacement, host permissions, and lifecycle controls. Do not assume Plan completes goals like Build. Keep the tested archive unchanged for publication.
 
 ## Publish
 

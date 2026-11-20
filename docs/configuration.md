@@ -17,7 +17,9 @@ Add the directory to the existing `plugins` array in `opencode.json` or `opencod
 }
 ```
 
-Use a directory, not `dist/index.js`. Preserve other entries and keep the built-in `opencode.goal` enabled. No `cli.json` entry or TUI component is required.
+Use a directory, not `dist/index.js`. Preserve other entries and keep the built-in `opencode.goal` enabled. The bundled `./tui` entry loads automatically; no separate `cli.json` entry is required.
+
+The TUI adds `Goal operation: create` or `Goal operation: replace` beside the pending native permission form. It reads only the current session's first pending request and labels only this plugin's Goal requests. It never replies to requests or changes their permission decision. The server also preserves existing permission messages and appends `Operation: create` or `Operation: replace` for clients that display the message.
 
 The plugin has no custom configuration options. Watched configuration changes reload automatically; `/reload` can force a configuration reload.
 
@@ -72,7 +74,7 @@ Mutations check action `goal`, resource `create` or `replace`, using the current
 
 Merge the rule into existing permissions rather than replacing unrelated rules.
 
-The built-in `plan` agent is rejected before the permission check. Custom planning agents with other IDs must deny `goal` in their own permission rules. Reading does not activate a goal.
+The plugin does not reject mutations based on an agent's name. Plan and other agents use the same permission checks and explicit-request safeguards. To disallow goal mutations for a planning agent, deny `goal` in its host permission rules. Goal management does not authorize project implementation or override host restrictions. Reading does not activate a goal.
 
 ### Errors and concurrency
 

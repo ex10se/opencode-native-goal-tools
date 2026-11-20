@@ -7,7 +7,7 @@ Goals remain native: the standard indicator, reviewer, continuation loop and `/g
 
 ## Requirements
 
-- OpenCode **2.3.0** (tested contract)
+- The latest stable OpenCode release
 - The built-in `opencode.goal` plugin enabled
 - Node.js **22.18.0+** and npm to build from source
 
@@ -30,7 +30,9 @@ Add the package directory to your OpenCode configuration:
 }
 ```
 
-Keep existing plugin entries. OpenCode reloads watched configuration changes; use `/reload` if necessary. There is no TUI plugin to configure.
+Keep existing plugin entries. OpenCode reloads watched configuration changes; use `/reload` if necessary. The bundled `./tui` entry loads automatically with the server plugin.
+
+While a Goal permission request is pending, the TUI shows `Goal operation: create` or `Goal operation: replace` beside the native confirmation form. The native buttons and permission rules are unchanged. The generic form in OpenCode 2.3.2 still says `Tool: goal`; the adjacent label identifies the operation.
 
 ## Install from a package archive
 
@@ -68,8 +70,9 @@ All tools are bound to the calling session. Another session cannot be selected t
 - For an explicit correction request, read `get_goal` and pass its ID to `replace_goal`; it replaces active, paused, or completed goals with a new active goal
 - Replacement rejects a stale expected ID; it is not an in-place edit or an automatic continuation of a paused goal
 - Use native `/goal pause`, `/goal resume` and `/goal clear` for lifecycle control
-- Plan can read goals but cannot create or replace them
+- Plan can read, create, and explicitly replace goals, subject to host permissions; this does not authorize project implementation
 - Mutations check the host permission action `goal`, resource `create` or `replace`
+- Owned approval requests add `Operation: create` or `Operation: replace` to the native permission message, retaining any existing reason. This presentation hook does not grant permission. Load this plugin after permission-policy plugins that rewrite messages or escalate to `ask`; later hooks can otherwise overwrite or omit the operation label.
 - The native reviewer determines completion; the plugin cannot mark goals complete
 
 ## Limits and failure handling
@@ -94,7 +97,7 @@ npm run test:package -- /path/to/opencode
 npm pack --dry-run
 ```
 
-The smoke test starts a private OpenCode 2.3.0 server and a deterministic loopback model with isolated configuration, home and database. It checks tool calls during active execution, idempotency, implicit replacement refusal, explicit replacement of a completed goal, stale-ID refusal, Plan refusal and native completion. It uses no real provider credentials. The test prints its diagnostic directory and terminates its private server.
+The smoke test checks that its OpenCode executable matches the latest stable release in the public npm registry. It starts a private server and a deterministic loopback model with isolated configuration, home and database. It checks tool calls during active execution, idempotency, implicit replacement refusal, explicit replacement of a completed goal, stale-ID refusal, Plan creation/readback/replacement and native completion in Build. Plan lifecycle state is observed rather than assumed to match Build. It uses no real provider credentials. The test prints its actual host version and diagnostic directory and terminates its private server.
 
 ## More
 

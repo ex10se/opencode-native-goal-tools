@@ -4,7 +4,7 @@
 
 Expose OpenCode's existing session Goal to the model through `get_goal`, `create_goal`, and `replace_goal`. OpenCode owns the state, UI indicator, reviewer, and continuation loop. The adapter has no goal store, background scheduler, or replacement `/goal` command.
 
-The implementation targets the OpenCode 2.3.0 public plugin and session APIs.
+The implementation targets the latest stable OpenCode public plugin and session APIs. SDK versions are pinned in the lockfile and refreshed before release verification.
 
 ## Components
 
@@ -12,7 +12,9 @@ The implementation targets the OpenCode 2.3.0 public plugin and session APIs.
 | --- | --- |
 | `src/index.ts` | Register tools, check permissions, validate RPC results, and connect to OpenCode |
 | `src/goal.ts` | Validate objectives, serialize creation, protect existing goals, and verify results |
+| `src/tui.tsx`, `src/presentation.ts` | Label the current session's pending Goal permission beside the native form without replying to it |
 | `test/goal.test.ts` | Exercise policy and failure paths through a narrow native-state port |
+| `test/plugin.test.mjs` | Exercise adapter permissions and state safeguards in Build and Plan |
 | `test/smoke.mjs` | Exercise real tools and native lifecycle in a private OpenCode server |
 | `test/package.mjs` | Verify the archive and run the lifecycle check through its public export |
 
@@ -21,7 +23,7 @@ SDK imports are type-only. The read RPC contract uses JSON Schema so the compile
 ## Creation flow
 
 1. Use the tool context's session ID and agent ID
-2. Reject creation from `plan` and assert the `goal` / `create` permission
+2. Assert the `goal` / `create` permission for the current agent, including `plan`
 3. Serialize creation calls for the same session within this plugin instance
 4. Normalize and validate the objective using the native command's quote and whitespace rules
 5. Read `opencode.goal.get`; return a matching active goal, or reject any other existing goal
@@ -36,7 +38,7 @@ Creation does not wait for the session to finish. The native command persists th
 
 For explicit corrections, `replace_goal` follows the same mutation path but checks that the current ID matches `expected_goal_id` rather than requiring absence. Active, paused, and completed goals may be replaced. The returned state must have a new ID. This is native replacement, not an in-place objective update.
 
-Creation and replacement share the same per-session serialization queue. Replacement checks permission resource `replace` and is also unavailable in Plan.
+Creation and replacement share the same per-session serialization queue. Replacement checks permission resource `replace`. Both mutations are available in Plan subject to host permissions, without granting permission to implement project changes.
 
 ## Failure handling
 

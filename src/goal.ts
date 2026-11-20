@@ -13,8 +13,7 @@ export interface GoalPort {
 export function createGoalTools(port: GoalPort) {
   const pending = new Map<string, Promise<unknown>>();
 
-  async function write(sessionID: string, agent: string, input: string, expectedID?: string): Promise<Goal> {
-    if (agent.toLowerCase() === "plan") throw new Error("Goal creation is unavailable in Plan mode.");
+  async function write(sessionID: string, input: string, expectedID?: string): Promise<Goal> {
     if (expectedID !== undefined && !expectedID.trim()) throw new Error("A nonempty expected goal ID is required.");
     const objective = normalize(input);
     const previous = await port.get(sessionID);
@@ -52,10 +51,10 @@ export function createGoalTools(port: GoalPort) {
 
   return {
     get: (sessionID: string) => port.get(sessionID),
-    create: (sessionID: string, agent: string, objective: string) =>
-      serialized(sessionID, () => write(sessionID, agent, objective)),
-    replace: (sessionID: string, agent: string, expectedID: string, objective: string) =>
-      serialized(sessionID, () => write(sessionID, agent, objective, expectedID)),
+    create: (sessionID: string, _agent: string, objective: string) =>
+      serialized(sessionID, () => write(sessionID, objective)),
+    replace: (sessionID: string, _agent: string, expectedID: string, objective: string) =>
+      serialized(sessionID, () => write(sessionID, objective, expectedID)),
   };
 }
 

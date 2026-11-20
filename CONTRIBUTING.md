@@ -1,6 +1,6 @@
 # Contributing
 
-Use Node.js >=22.18.0 and npm. Install development dependencies with `npm ci --ignore-scripts`. Native lifecycle checks also require an OpenCode 2.3.0 executable and a POSIX environment with `tar`.
+Use Node.js >=22.18.0 and npm. Install development dependencies with `npm ci --ignore-scripts`. Package checks require the latest stable OpenCode executable and a POSIX environment with `tar` and Python 3 for the TUI pseudo-terminal capture. Refresh the pinned OpenCode SDK development dependencies to their latest stable releases before release verification.
 
 ## Before submitting changes
 
@@ -17,7 +17,7 @@ The package check builds an archive, loads its public export without installed S
 
 Edit `src`, not generated `dist` files. Preserve the default ESM server export, tool names, and session-bound arguments. Changes must continue to use the native Goal state and lifecycle rather than introduce a separate goal store or continuation loop.
 
-Add regression coverage when changing behavior. Permission checks, Plan refusal, existing-goal protection, expected-ID checks for explicit replacement, and verification after command execution are part of the public contract.
+Add regression coverage when changing behavior. Permission checks in every mode including Plan, existing-goal protection, expected-ID checks for explicit replacement, and verification after command execution are part of the public contract.
 
 ## Documentation and reports
 

@@ -64,12 +64,12 @@ for (const objective of ["", "   ", "pause", '"resume"', "‘clear’", "x".repe
   });
 }
 
-test("rejects Plan before accessing the native API", async () => {
-  const tools = createGoalTools({
-    async get() { assert.fail("Plan must not read during create"); },
-    async create() { assert.fail("Plan must not write"); },
+test("Plan creates and verifies native state", async () => {
+  const f = fixture();
+  assert.deepEqual(await f.tools.create("session", "Plan", "Ship"), {
+    id: "goal-1", objective: "Ship", status: "active",
   });
-  await assert.rejects(tools.create("session", "Plan", "Ship"), /plan/i);
+  assert.equal(f.writes(), 1);
 });
 
 test("reports a partial command failure with persisted state and does not retry", async () => {
@@ -117,13 +117,15 @@ test("replacement requires an existing goal and an explicit expected ID", async 
   assert.equal(f.writes(), 0);
 });
 
-test("replacement refuses Plan without accessing the native API", async () => {
-  const tools = createGoalTools({
-    async get() { assert.fail("Plan replacement must not read"); },
-    async create() { assert.fail("Plan replacement must not write"); },
+for (const status of ["active", "paused", "complete"] as const) {
+  test(`Plan replaces the expected ${status} goal`, async () => {
+    const f = fixture({ id: "old", objective: "Old", status });
+    assert.deepEqual(await f.tools.replace("session", "Plan", "old", "New"), {
+      id: "goal-1", objective: "New", status: "active",
+    });
+    assert.equal(f.writes(), 1);
   });
-  await assert.rejects(tools.replace("session", "Plan", "old", "New"), /plan/i);
-});
+}
 
 test("two concurrent replacements with the same old ID cannot replace each other", async () => {
   const f = fixture({ id: "old", objective: "Old", status: "complete" });

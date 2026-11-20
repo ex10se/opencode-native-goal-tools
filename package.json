@@ -12,25 +12,57 @@
   "bugs": {
     "url": "https://github.com/ex10se/opencode-native-goal-tools/issues"
   },
-  "keywords": ["opencode", "plugin", "goal", "agent-tools", "native-goal"],
+  "keywords": [
+    "opencode",
+    "plugin",
+    "goal",
+    "agent-tools",
+    "native-goal"
+  ],
   "type": "module",
-  "engines": { "node": ">=22.18.0" },
-  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
-  "files": ["dist", "LICENSE", "README.md", "README.ru.md", "CHANGELOG.md", "CONTRIBUTING.md", "SECURITY.md", "docs"],
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./tui": {
+      "types": "./dist/tui.d.ts",
+      "import": "./dist/tui.jsx"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md",
+    "README.ru.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "docs"
+  ],
   "scripts": {
     "test": "node --experimental-strip-types --test test/*.test.ts test/*.test.mjs",
-    "audit:policy": "node scripts/audit.mjs",
+    "audit:policy": "npm audit --audit-level=moderate --registry=https://registry.npmjs.org",
     "test:smoke": "node test/smoke.mjs",
     "test:package": "node test/package.mjs",
     "typecheck": "tsc --noEmit",
     "build": "tsc",
     "prepack": "npm run typecheck && npm run build"
   },
-  "overrides": { "glob": "14.0.3", "minimatch": "11.0.4" },
+  "overrides": {
+    "glob": "14.0.3",
+    "minimatch": "11.0.4"
+  },
   "devDependencies": {
-    "@opencode/plugin": "2.3.0",
-    "@opencode/schema": "2.3.0",
+    "@opencode/plugin": "2.3.2",
+    "@opencode/schema": "2.3.2",
+    "@opentui/core": "0.9.2",
+    "@opentui/solid": "0.9.2",
     "@types/node": "22.19.0",
+    "solid-js": "1.9.19",
     "typescript": "5.9.3"
   }
 }
