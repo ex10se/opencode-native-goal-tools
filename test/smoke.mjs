@@ -6,6 +6,7 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { createScreen } from "./terminal.mjs";
 
 const root = await mkdtemp(join(tmpdir(), "native-goal-smoke-"));
 const project = join(root, "project");
@@ -137,6 +138,8 @@ const child = spawn(binary, ["serve", "--hostname", "127.0.0.1", "--port", "0"],
 let output = "";
 let terminal;
 let terminalOutput = "";
+const screen = renderPermissions ? createScreen(columns) : undefined;
+let screenWrite = Promise.resolve();
 for (const stream of [child.stdout, child.stderr]) stream.on("data", chunk => { output += chunk; });
 let spawnError;
 child.on("error", error => { spawnError = error; });
@@ -211,7 +214,10 @@ finally:
       stdio: ["pipe", "pipe", "pipe"],
     });
     for (const stream of [terminal.stdout, terminal.stderr]) {
-      stream.on("data", chunk => { terminalOutput += chunk; });
+      stream.on("data", chunk => {
+        terminalOutput += chunk;
+        screenWrite = screenWrite.then(() => screen.write(chunk));
+      });
     }
   }
   const goal = async (sessionID = id) => {
@@ -238,12 +244,12 @@ finally:
         } catch (error) { if (error.code === "ENOENT") return false; throw error; }
       }, `${operation} serialized permission.asked`);
       if (renderPermissions) {
-        await until(() => {
+        await until(async () => {
           if (terminal.exitCode !== null) throw new Error(`TUI exited: ${terminalOutput}`);
-          const text = terminalOutput.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "");
-          // OpenTUI may position words with cursor moves instead of printing spaces.
-          return new RegExp(`Goal\\s*operation:\\s*${operation}`).test(text);
+          await screenWrite;
+          return screen.text().includes(`Goal operation: ${operation}`);
         }, `${operation} visible TUI message`);
+        await writeFile(join(root, `screen-${operation}.txt`), screen.text());
         await writeFile(join(root, `rendered-${operation}`), "verified");
       }
       await until(async () => {
@@ -348,6 +354,9 @@ finally:
     terminal.stdin.write("\x03");
     terminal.kill("SIGTERM");
     await writeFile(join(root, "terminal-output.log"), terminalOutput);
+    await screenWrite;
+    await writeFile(join(root, "screen-final.txt"), screen.text());
+    screen.dispose();
   }
   if (permissionOnly) await writeFile(join(root, "fixture-results.json"), JSON.stringify({ requestedTools, toolResults }));
   await writeFile(join(root, "server.log"), output);
