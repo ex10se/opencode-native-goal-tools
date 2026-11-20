@@ -256,9 +256,17 @@ finally:
         try { return (await readFile(join(root, "permission-replies.jsonl"), "utf8")).split("\n").includes(JSON.stringify(operation)); }
         catch (error) { if (error.code === "ENOENT") return false; throw error; }
       }, "permission rejected");
+      if (renderPermissions) {
+        await until(async () => {
+          await screenWrite;
+          return !screen.text().includes("Goal operation:");
+        }, `${operation} label removed after rejection`);
+        await writeFile(join(root, `screen-${operation}-removed.txt`), screen.text());
+      }
       assert.equal(await goal(), null);
     }
-    console.log(JSON.stringify({ result: "PASS", version: info.version, permissionMessages: evidence.map(event => event.data.message), rendered: renderPermissions, columns, goal: null, artifacts: root }));
+    assert.doesNotMatch(output + terminalOutput, /stage=read|Cannot find (?:module|package)|ReferenceError|TypeError/);
+    console.log(JSON.stringify({ result: "PASS", version: info.version, permissionMessages: evidence.map(event => event.data.message), rendered: renderPermissions, removed: renderPermissions, columns, goal: null, artifacts: root }));
   } else {
   await api(`/api/session/${id}/prompt`, { text: "SMOKE_CREATE: explicitly create the fixture objective, then read it." });
   let saved;

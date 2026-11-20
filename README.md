@@ -11,7 +11,9 @@ Goals remain native: the standard indicator, reviewer, continuation loop and `/g
 - The built-in `opencode.goal` plugin enabled
 - Node.js **22.18.0+** and npm to build from source
 
-The source and local-archive installation methods below do not require npm publication.
+The package is available on [npm](https://www.npmjs.com/package/opencode-native-goal-tools).
+Published version 0.1.0 has a TUI loading defect when installed under `node_modules` in OpenCode 2.3.2.
+Version 0.1.1 fixes the package build. Install from source or a built archive as described below.
 
 ## Install from source
 
@@ -36,18 +38,19 @@ While a Goal permission request is pending, the TUI shows `Goal operation: creat
 
 ## Install from a package archive
 
-Use the `opencode-native-goal-tools-0.1.0.tgz` package archive from a release, or build it from source with `npm pack`. In a separate installation directory, run:
+Build `opencode-native-goal-tools-0.1.1.tgz` from the current source with `npm pack`. In a separate installation directory, run:
 
 ```sh
-npm install --ignore-scripts /path/to/opencode-native-goal-tools-0.1.0.tgz
+npm install --ignore-scripts /path/to/opencode-native-goal-tools-0.1.1.tgz
 ```
 
 Set `plugins` to the absolute installed directory ending in `node_modules/opencode-native-goal-tools`. A GitHub source archive is not a built npm package; use the source instructions for it.
 
-After publication to npm, the registry installation command is:
+For registry installation, check that the requested version is available, then install it:
 
 ```sh
-npm install --ignore-scripts opencode-native-goal-tools@0.1.0
+npm view opencode-native-goal-tools@0.1.1 version
+npm install --ignore-scripts opencode-native-goal-tools@0.1.1
 ```
 
 Use the same installed-directory configuration. See [Releasing](docs/releasing.md) for archive verification.
@@ -98,6 +101,8 @@ npm pack --dry-run
 ```
 
 The smoke test checks that its OpenCode executable matches the latest stable release in the public npm registry. It starts a private server and a deterministic loopback model with isolated configuration, home and database. It checks tool calls during active execution, idempotency, implicit replacement refusal, explicit replacement of a completed goal, stale-ID refusal, Plan creation/readback/replacement and native completion in Build. Plan lifecycle state is observed rather than assumed to match Build. It uses no real provider credentials. The test prints its actual host version and diagnostic directory and terminates its private server.
+
+`test:package` installs the exact archive into an empty consumer's physical `node_modules` with scripts disabled and no plugin development dependencies, then runs lifecycle and real TUI checks at 120 and 60 columns. The build precompiles Solid JSX to ESM; OpenCode supplies the external Solid/OpenTUI runtime.
 
 ## More
 

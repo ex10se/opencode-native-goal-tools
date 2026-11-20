@@ -1,6 +1,6 @@
 # Package preparation and release
 
-The initial version is 0.1.0. These instructions describe a manual release; the CI workflow does not publish packages or create releases.
+Version 0.1.0 is published on [npm](https://www.npmjs.com/package/opencode-native-goal-tools) with a known installed-layout TUI defect. Version 0.1.1 corrects the package build. These instructions describe its manual release; CI does not publish packages or create releases.
 
 ## Prepare
 
@@ -24,7 +24,7 @@ exceptions. Moderate-or-higher findings and audit errors block release.
 The separately installed OpenCode smoke host has its own dependency tree;
 this package's audit does not establish that host's security.
 
-The repository already exists. Its visibility, pushed release commit, and npm publication must be verified separately; a dated changelog is not proof of publication. Installation instructions cover source checkouts and local archives, with registry installation conditional on publication.
+The repository already exists. Its visibility, pushed release commit, and each version's npm publication must be verified separately; a dated changelog is not proof of publication.
 
 ## Build the archive
 
@@ -32,11 +32,11 @@ The repository already exists. Its visibility, pushed release commit, and npm pu
 npm pack
 ```
 
-For version 0.1.0 the archive is `opencode-native-goal-tools-0.1.0.tgz`. Inspect the actual command output and contents:
+For version 0.1.1 the archive is `opencode-native-goal-tools-0.1.1.tgz`. Inspect the actual command output and contents:
 
 ```sh
-tar -tzf opencode-native-goal-tools-0.1.0.tgz
-shasum -a 256 opencode-native-goal-tools-0.1.0.tgz
+tar -tzf opencode-native-goal-tools-0.1.1.tgz
+shasum -a 256 opencode-native-goal-tools-0.1.1.tgz
 ```
 
 The archive should contain `dist`, the manifest, license, and public documentation. It must not contain source tests, local configuration, credentials, or temporary smoke data. `prepack` runs typecheck and build, not the complete test suite.
@@ -44,25 +44,27 @@ The archive should contain `dist`, the manifest, license, and public documentati
 Install the exact archive in a separate empty directory:
 
 ```sh
-npm install --ignore-scripts /absolute/path/to/opencode-native-goal-tools-0.1.0.tgz
+npm install --ignore-scripts /absolute/path/to/opencode-native-goal-tools-0.1.1.tgz
 ```
 
 In an isolated OpenCode configuration, point `plugins` to the installed directory ending in `node_modules/opencode-native-goal-tools`. Check tool availability, native state, Plan creation/readback/replacement, host permissions, and lifecycle controls. Do not assume Plan completes goals like Build. Keep the tested archive unchanged for publication.
+
+`npm run test:package -- /absolute/path/to/opencode` performs this physical installation before every smoke mode and prints the tested archive path and SHA-256. It also checks real TUI labels at 120 and 60 columns, including removal after rejection. An extracted directory outside `node_modules` is not equivalent: it missed the 0.1.0 loader defect. Ensure `dist/tui.js` is exported, with no JSX artifact or bundled runtime.
 
 ## Publish
 
 After the repository, release commit, and package have been verified:
 
-Confirm `npm whoami` reports the intended publisher. If authentication is required, log in interactively before publishing. Confirm version 0.1.0 is not already published; do not overwrite or blindly retry a publication.
+Confirm `npm whoami` reports the intended publisher. If authentication is required, log in interactively before publishing. Confirm version 0.1.1 is not already published; do not overwrite or blindly retry a publication.
 
 ```sh
-npm publish /absolute/path/to/opencode-native-goal-tools-0.1.0.tgz --access public --tag latest
-npm view opencode-native-goal-tools@0.1.0 version dist.integrity
+npm publish /absolute/path/to/opencode-native-goal-tools-0.1.1.tgz --access public --tag latest
+npm view opencode-native-goal-tools@0.1.1 version dist.integrity
 ```
 
-Create a matching `v0.1.0` tag and GitHub release for that commit, attaching the tested archive and checksum. For another version, update all versioned names consistently.
+Create a matching `v0.1.1` tag and GitHub release for that commit, attaching the tested archive and checksum. For another version, update all versioned names consistently.
 
-Use the [0.1.0 release notes](releases/0.1.0.md) as the release description. Verify the public release page, tag target, attached archive checksum, and registry version/integrity after publication.
+Use the [0.1.1 release notes](releases/0.1.1.md) as the release description. Finalize all packaged documentation before building the verified archive; publish and attach that exact archive without editing or repacking it. Verify the public release page, tag target, attached archive checksum, and registry version/integrity after publication.
 
 Verify a clean registry installation and repeat the real-host check. A published version cannot be replaced with different contents; fixes require a new version.
 
