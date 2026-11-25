@@ -25,15 +25,17 @@ prints the actual host version and diagnostic directory.
 
 ## Coverage
 
-- Core: objective validation, existing-state protection, serialized creation
-  and replacement, expected IDs, partial failures, and post-write verification
+- Core: objective validation, existing-state protection, serialized creation,
+  replacement, and resumption, expected IDs, partial failures, and post-write
+  verification
 - Adapter: Build and Plan permissions, host denial before native state access,
   operation messages, preservation of existing reasons, and foreign requests
-- TUI: English operation labels beside the native confirmation form, both
+- TUI: English operation labels beside the native confirmation form, all
   actions and both terminal widths; labels disappear after rejection and
   rejecting the requests leaves Goal absent
-- Native lifecycle: pause, resume, completion, clear, duplicate creation,
-  explicit replacement, stale-ID rejection, and Plan create/read/replace/read
+- Native lifecycle: pause, resumption, completion, clear, duplicate creation,
+  explicit replacement, stale-ID rejection, completed-goal resume refusal,
+  and Plan create/read/replace/read
 - Package: both entrypoints, declaration files, no installed runtime dependencies,
   compiled ESM without JSX/React imports, no obsolete JSX artifact,
   and no development source/tests or temporary fixtures
@@ -50,7 +52,11 @@ on OpenCode 2.3.2 because its JSX entry bypassed the host Solid transform.
 The 0.1.1 correction passed the physical npm-layout lifecycle and Plan checks
 on OpenCode 2.3.2, plus real TUI appearance/removal for both operations at
 120 and 60 columns. The installed consumer had no runtime dependencies.
-For each release, verify publication and hosted CI separately from local checks.
+The 0.1.2 resumption checks passed on OpenCode 2.4.1: the native lifecycle
+paused a goal, `resume_goal` resumed it to completion with the same ID, a
+completed goal refused resumption, and the `Operation: resume` label appeared
+and disappeared at both terminal widths. For each release, verify publication
+and hosted CI separately from local checks.
 
 The current full audit reports zero vulnerabilities. The earlier temporary
 exception for GHSA-fc5q-39xc-vjpf was removed after its upstream withdrawal
@@ -64,5 +70,5 @@ jobs and local results do not establish a successful hosted run.
 
 The native API does not provide atomic conditional writes against simultaneous
 manual Goal changes. The TUI label is adjacent to the native form; the generic
-form in OpenCode 2.3.2 still says `Tool: goal`. Windows smoke execution and all
+form still says `Tool: goal`. Windows smoke execution and all
 third-party plugin combinations are not covered.

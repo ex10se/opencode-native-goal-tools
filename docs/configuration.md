@@ -19,7 +19,7 @@ Add the directory to the existing `plugins` array in `opencode.json` or `opencod
 
 Use a directory, not `dist/index.js`. Preserve other entries and keep the built-in `opencode.goal` enabled. The bundled `./tui` entry loads automatically; no separate `cli.json` entry is required.
 
-The TUI adds `Goal operation: create` or `Goal operation: replace` beside the pending native permission form. It reads only the current session's first pending request and labels only this plugin's Goal requests. It never replies to requests or changes their permission decision. The server also preserves existing permission messages and appends `Operation: create` or `Operation: replace` for clients that display the message.
+The TUI adds `Goal operation: create`, `Goal operation: replace`, or `Goal operation: resume` beside the pending native permission form. It reads only the current session's first pending request and labels only this plugin's Goal requests. It never replies to requests or changes their permission decision. The server also preserves existing permission messages and appends `Operation: create`, `Operation: replace`, or `Operation: resume` for clients that display the message.
 
 The plugin has no custom configuration options. Watched configuration changes reload automatically; `/reload` can force a configuration reload.
 
@@ -30,6 +30,7 @@ The plugin has no custom configuration options. Watched configuration changes re
 | `get_goal` | `{}` | Native Goal state or `null` |
 | `create_goal` | `{ "objective": "..." }` | Native state verified after creation, or the matching existing active goal |
 | `replace_goal` | `{ "objective": "...", "expected_goal_id": "..." }` | Verified replacement state with a new native ID |
+| `resume_goal` | `{ "expected_goal_id": "..." }` | Verified active state with the same native ID |
 
 The output is JSON text in the tool result. All tools are bound to the caller's session. The model cannot supply a different session ID.
 
@@ -54,6 +55,12 @@ Objectives are never truncated.
 
 Use the native `/goal pause`, `/goal resume`, and `/goal clear` commands to manage an existing goal. The native reviewer determines completion.
 
+### Resuming a paused goal
+
+When the user explicitly asks to resume or unpause a goal, read `get_goal` and call `resume_goal` with that exact ID as `expected_goal_id`. The goal must be paused; an already active goal is returned unchanged, and a completed goal cannot be resumed - use `replace_goal` instead.
+
+Resumption preserves the native ID and objective. An absent goal or a changed ID is an error; inspect the current state rather than retry automatically. The native reviewer still decides when a resumed goal completes.
+
 ### Explicit corrections
 
 When the user explicitly asks to correct, change, or replace a goal, read `get_goal` and call `replace_goal` with that exact ID as `expected_goal_id` and the full corrected objective. The goal may be active, paused, or complete.
@@ -62,7 +69,7 @@ Replacement creates a new active native goal with a new ID. It does not edit the
 
 ### Permissions and Plan
 
-Mutations check action `goal`, resource `create` or `replace`, using the current agent's permissions. To prohibit both explicitly:
+Mutations check action `goal`, resource `create`, `replace`, or `resume`, using the current agent's permissions. To prohibit all of them explicitly:
 
 ```json
 {

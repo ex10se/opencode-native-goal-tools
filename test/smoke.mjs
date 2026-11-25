@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { createScreen } from "./terminal.mjs";
+import { activeResult } from "./smoke-results.mjs";
 
 const root = await mkdtemp(join(tmpdir(), "native-goal-smoke-"));
 const project = join(root, "project");
@@ -23,6 +24,14 @@ await mkdir(join(root, "config/opencode"), { recursive: true });
 let calls = 0;
 let toolResults = [];
 let requestedTools = [];
+let scenarioCalls = new Set();
+const resumeEvidence = {};
+function scenario(next) {
+  actions = next;
+  scenarioCalls = new Set();
+  toolResults = [];
+  return next;
+}
 let finishGoal = false;
 const objective = "Verify native Goal tools inside an active execution";
 let actions = [
@@ -38,7 +47,7 @@ const model = createServer(async (req, res) => {
     calls++;
     const messages = body.messages ?? [];
     const isJudge = messages.some(m => JSON.stringify(m.content).includes("You are now the reviewer for the session"));
-    const results = messages.filter(m => m.role === "tool");
+    const results = messages.filter(m => m.role === "tool" && scenarioCalls.has(m.tool_call_id));
     toolResults.push(...results);
     const available = (body.tools ?? []).map(t => t.function.name);
     const marker = messages.some(m => JSON.stringify(m.content).includes("SMOKE_CREATE"));
@@ -47,6 +56,8 @@ const model = createServer(async (req, res) => {
     if (tool) {
       assert(available.includes(tool), `Missing ${tool}; available=${available}`);
       requestedTools.push(tool);
+      action.callID = `call_${calls}`;
+      scenarioCalls.add(action.callID);
     }
     const message = tool
       ? { role: "assistant", tool_calls: [{ index: 0, id: `call_${calls}`, type: "function", function: { name: tool, arguments: JSON.stringify(action.args) } }] }
@@ -229,9 +240,9 @@ finally:
     const { readFile } = await import("node:fs/promises");
     const evidence = [];
     for (const operation of ["create", "replace", "resume"]) {
-      actions = [{ name: `${operation}_goal`, args: operation === "get"
+       scenario([{ name: `${operation}_goal`, args: operation === "get"
         ? {}
-        : { objective: "Must not be saved", expected_goal_id: "fixture-old" } }];
+         : { objective: "Must not be saved", expected_goal_id: "fixture-old" } }]);
       await api(`/api/session/${id}/prompt`, { text: `SMOKE_CREATE: test isolated ${operation} permission rejection.` });
       await until(async () => {
         try {
@@ -289,35 +300,29 @@ finally:
   });
   assert(ids.length >= 3, "Expected create, get and idempotent create results");
   assert.deepEqual([...new Set(ids)], [saved.id], "Duplicate create replaced the goal");
-  actions = [{ name: "resume_goal", args: { expected_goal_id: saved.id } }];
-  toolResults = [];
+   const [buildResume] = scenario([{ name: "resume_goal", args: { expected_goal_id: saved.id } }]);
   finishGoal = true;
   await api(`/api/session/${id}/prompt`, { text: "SMOKE_CREATE: explicitly resume the paused goal." });
   await until(async () => (await goal())?.status === "complete", "paused goal explicitly resumed to completion");
   assert.equal((await goal()).id, saved.id);
   assert.equal((await goal()).objective, objective);
-  const resumedStates = toolResults.flatMap(m => {
-    try {
-      const raw = typeof m.content === "string" ? m.content : m.content.map(p => p.text ?? "").join("");
-      return [JSON.parse(raw)];
-    } catch { return []; }
-  }).filter(g => g.id === saved.id);
-  assert(resumedStates.some(g => g.status === "active"), "Resume did not return the active native state");
-  actions = [{ name: "resume_goal", args: { expected_goal_id: saved.id } }];
-  toolResults = [];
+   resumeEvidence.build = {
+     callID: buildResume.callID,
+     before: saved,
+     result: activeResult(toolResults, buildResume.callID, saved),
+   };
+   const [completedResume] = scenario([{ name: "resume_goal", args: { expected_goal_id: saved.id } }]);
   await api(`/api/session/${id}/prompt`, { text: "SMOKE_CREATE: verify resume refusal for a completed goal." });
-  await until(() => toolResults.some(m => JSON.stringify(m.content).includes("complete")), "completed goal resume rejected");
+   await until(() => toolResults.some(m => m.tool_call_id === completedResume.callID && JSON.stringify(m.content).includes("complete")), "completed goal resume rejected");
   assert.equal((await goal()).id, saved.id);
   assert.equal((await goal()).status, "complete");
   assert.equal((await goal()).id, saved.id);
-  actions = [{ name: "create_goal", args: { objective: "Different objective" } }];
-  toolResults = [];
+   scenario([{ name: "create_goal", args: { objective: "Different objective" } }]);
   await api(`/api/session/${id}/prompt`, { text: "SMOKE_CREATE: attempt replacement to verify refusal." });
   await until(() => toolResults.some(m => JSON.stringify(m.content).includes("existing goal")), "replacement rejected");
   assert.equal((await goal()).id, saved.id);
   const correctedObjective = "Finish the remaining work after the completed goal";
-  actions = [{ name: "replace_goal", args: { objective: correctedObjective, expected_goal_id: saved.id } }];
-  toolResults = [];
+   scenario([{ name: "replace_goal", args: { objective: correctedObjective, expected_goal_id: saved.id } }]);
   await api(`/api/session/${id}/prompt`, { text: "SMOKE_CREATE: explicitly replace the completed goal with the corrected objective." });
   let corrected;
   await until(async () => {
@@ -326,11 +331,11 @@ finally:
   }, "completed goal explicitly replaced and completed");
   assert.notEqual(corrected.id, saved.id);
   assert(toolResults.some(m => JSON.stringify(m.content).includes(corrected.id)), "Replacement did not return the new native state");
-  actions = [{ name: "replace_goal", args: { objective: "Stale correction", expected_goal_id: saved.id } }];
-  toolResults = [];
+   scenario([{ name: "replace_goal", args: { objective: "Stale correction", expected_goal_id: saved.id } }]);
   await api(`/api/session/${id}/prompt`, { text: "SMOKE_CREATE: verify stale replacement refusal." });
   await until(() => toolResults.some(m => JSON.stringify(m.content).includes("goal changed")), "stale replacement rejected");
-  assert.equal((await goal()).id, corrected.id);
+   assert.equal((await goal()).id, corrected.id);
+   finishGoal = false;
   const plan = await api("/api/session", {
     location: { directory: project }, title: "Plan positive smoke",
     model: { providerID: "fixture", id: "fixture" }, agent: "plan",
@@ -348,22 +353,51 @@ finally:
     }
     return [...results.values()];
   }
-  actions = [
+   scenario([
     { name: "create_goal", args: { objective } },
     { name: "get_goal", args: {} },
-  ];
-  toolResults = [];
+   ]);
   await api(`/api/session/${plan.data.id}/prompt`, { text: "SMOKE_CREATE: explicitly create the fixture goal in Plan, then read it." });
   await until(() => planResults(objective).length === 2, "Plan create and read returned");
   const planSaved = await goal(plan.data.id);
   assert.equal(planSaved.objective, objective);
-  assert.deepEqual([...new Set(planResults(objective).map(g => g.id))], [planSaved.id]);
+   assert.deepEqual([...new Set(planResults(objective).map(g => g.id))], [planSaved.id]);
+   await until(async () => (await goal(plan.data.id))?.status === "paused", "Plan native reviewer paused the created goal");
+   const planPaused = await goal(plan.data.id);
+   assert.equal(planPaused.status, "paused");
+   assert.equal(planPaused.id, planSaved.id);
+   assert.equal(planPaused.objective, objective);
+   const [planResume, planRead] = scenario([
+     { name: "resume_goal", args: { expected_goal_id: planPaused.id } },
+     { name: "get_goal", args: {} },
+   ]);
+   await api(`/api/session/${plan.data.id}/prompt`, { text: "SMOKE_CREATE: explicitly resume the paused Plan goal, then read it." });
+   await until(() => toolResults.some(m => m.tool_call_id === planRead.callID), "Plan resume and read returned");
+   resumeEvidence.plan = {
+     pauseCause: "Native reviewer returned paused after Plan creation",
+     before: planPaused,
+     callID: planResume.callID,
+     result: activeResult(toolResults, planResume.callID, planPaused),
+     readCallID: planRead.callID,
+     readBack: activeResult(toolResults, planRead.callID, planPaused),
+   };
+   const planResumed = await goal(plan.data.id);
+   assert(["active", "paused"].includes(planResumed.status), "Plan reviewer may pause after verified active readback");
+   assert.equal(planResumed.id, planPaused.id);
+   assert.equal(planResumed.objective, objective);
+   resumeEvidence.plan.afterTurn = planResumed;
+   const [staleResume] = scenario([{ name: "resume_goal", args: { expected_goal_id: saved.id } }]);
+   await api(`/api/session/${plan.data.id}/prompt`, { text: "SMOKE_CREATE: explicitly request resumption with a stale ID to verify refusal." });
+   await until(() => toolResults.some(m => m.tool_call_id === staleResume.callID && JSON.stringify(m.content).includes("goal changed")), "Plan stale resume rejected");
+   resumeEvidence.plan.staleCallID = staleResume.callID;
+   resumeEvidence.plan.staleResults = toolResults.filter(m => m.tool_call_id === staleResume.callID);
+   assert.equal((await goal(plan.data.id)).id, planResumed.id);
+   assert.equal((await goal(plan.data.id)).objective, planResumed.objective);
   const planObjective = "Correct the planning objective without implementing project changes";
-  actions = [
+   scenario([
     { name: "replace_goal", args: { objective: planObjective, expected_goal_id: planSaved.id } },
     { name: "get_goal", args: {} },
-  ];
-  toolResults = [];
+   ]);
   await api(`/api/session/${plan.data.id}/prompt`, { text: "SMOKE_CREATE: explicitly replace the Plan goal with the corrected objective, then read it." });
   await until(() => planResults(planObjective).length === 2, "Plan replace and read returned");
   const planCorrected = await goal(plan.data.id);
@@ -374,7 +408,7 @@ finally:
   assert.equal(await goal(plan.data.id), null);
   await api(`/api/session/${id}/command`, { name: "goal", text: "clear" });
   assert.equal(await goal(), null);
-  console.log(JSON.stringify({ result: "PASS", version: info.version, tools: requestedTools, nativeLifecycle: ["paused", "complete", "cleared"], duplicate: "same id", implicitReplacement: "rejected", explicitReplacement: "new native id", staleReplacement: "rejected", resume: { completedRefused: true, newID: false }, plan: { create: planSaved.status, replace: planCorrected.status, newID: true, readBack: true }, calls, artifacts: root }));
+   console.log(JSON.stringify({ result: "PASS", version: info.version, tools: requestedTools, nativeLifecycle: ["paused", "complete", "cleared"], duplicate: "same id", implicitReplacement: "rejected", explicitReplacement: "new native id", staleReplacement: "rejected", resume: { completedRefused: true, newID: false }, plan: { create: planSaved.status, resume: planResumed.status, resumeSameID: true, staleResume: "rejected", replace: planCorrected.status, newID: true, readBack: true }, calls, artifacts: root }));
   }
 } finally {
   if (terminal) {
@@ -385,7 +419,7 @@ finally:
     await writeFile(join(root, "screen-final.txt"), screen.text());
     screen.dispose();
   }
-  if (permissionOnly) await writeFile(join(root, "fixture-results.json"), JSON.stringify({ requestedTools, toolResults }));
+   await writeFile(join(root, "fixture-results.json"), JSON.stringify({ requestedTools, toolResults, resumeEvidence }));
   await writeFile(join(root, "server.log"), output);
   if (child.pid) {
     try { process.kill(process.platform === "win32" ? child.pid : -child.pid, "SIGTERM"); }

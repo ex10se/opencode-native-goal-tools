@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.2
+
+- Added `resume_goal` to explicitly resume a paused goal after its expected native ID, preserving the ID and objective
+- An already active goal is returned unchanged, and a completed goal refuses resumption in favor of `replace_goal`
+- Extended the host permission action `goal` with the `resume` resource and the `Operation: resume` label beside the native TUI form
+- Verified paused-to-active Plan resumption and readback with the same ID and objective, stale-ID refusal, and the label at both terminal widths on OpenCode 2.4.1
+
 ## 0.1.1
 
 - Precompiled the Solid TUI entry to ESM so it loads from npm's `node_modules` layout in OpenCode 2.3.2

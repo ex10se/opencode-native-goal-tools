@@ -68,11 +68,44 @@ test("resume requires an existing goal, a nonempty expected ID, and never accept
 });
 
 test("resume reports the observed state after a failed native command, without retry", async () => {
-  const f = fixture({ id: "existing", objective: "Ship", status: "paused" });
-  f.port.resume = async () => { throw new Error("kickoff failed"); };
-  await assert.rejects(f.tools.resume("session", "build", "existing"), /kickoff failed.*Ship/s);
-  assert.equal(f.state()?.status, "paused");
+   const f = fixture({ id: "existing", objective: "Ship", status: "paused" });
+   let attempts = 0;
+   f.port.resume = async () => { attempts++; throw new Error("kickoff failed"); };
+   await assert.rejects(f.tools.resume("session", "build", "existing"), /kickoff failed.*Ship/s);
+   assert.equal(f.state()?.status, "paused");
+   assert.equal(attempts, 1);
 });
+
+test("partial resume failure reports persisted active state and never retries", async () => {
+  const f = fixture({ id: "existing", objective: "Ship", status: "paused" });
+  const resume = f.port.resume;
+  f.port.resume = async (...args) => { await resume(...args); throw new Error("kickoff failed"); };
+  await assert.rejects(f.tools.resume("session", "build", "existing"), /kickoff failed.*existing.*Ship.*active/s);
+  assert.equal(f.resumes(), 1);
+});
+
+test("concurrent resumes serialize into one native command", async () => {
+  const f = fixture({ id: "existing", objective: "Ship", status: "paused" });
+  const results = await Promise.all([
+    f.tools.resume("session", "build", "existing"),
+    f.tools.resume("session", "build", "existing"),
+  ]);
+  assert.deepEqual(results, [
+    { id: "existing", objective: "Ship", status: "active" },
+    { id: "existing", objective: "Ship", status: "active" },
+  ]);
+  assert.equal(f.resumes(), 1);
+});
+
+for (const change of [{ id: "different" }, { objective: "Different" }, { status: "paused" as const }]) {
+  test(`resume verification rejects changed ${Object.keys(change)[0]}`, async () => {
+    const f = fixture({ id: "existing", objective: "Ship", status: "paused" });
+    const resume = f.port.resume;
+    f.port.resume = async (...args) => { await resume(...args); Object.assign(f.state()!, change); };
+    await assert.rejects(f.tools.resume("session", "build", "existing"), /verify.*resumed/s);
+    assert.equal(f.resumes(), 1);
+  });
+}
 
 test("creates and verifies a native goal, normalizing whitespace and quotes", async () => {
   const f = fixture();

@@ -21,7 +21,9 @@ async function fixture(agent, initial = null, denied = false) {
     rpc: () => ({ get: async () => { reads++; return state; } }),
     session: { command: async ({ text }) => {
       writes++;
-      state = { id: `new-${writes}`, objective: text, status: "active" };
+      state = text === "resume"
+        ? { ...state, status: "active" }
+        : { id: `new-${writes}`, objective: text, status: "active" };
     } },
     permission: { hook: async (name, callback) => {
       assert.equal(name, "evaluate");
@@ -71,7 +73,19 @@ for (const agent of ["build", "plan", "Plan"]) {
       assert.deepEqual(f.state(), result);
     });
   }
-  for (const name of ["create_goal", "replace_goal"]) {
+  test(`${agent}: resume preserves identity, is idempotent and refuses stale IDs`, async () => {
+    const f = await fixture(agent, { id: "old", objective: "Keep", status: "paused" });
+    const result = await f.call("resume_goal", { expected_goal_id: "old" });
+    assert.deepEqual(result, { id: "old", objective: "Keep", status: "active" });
+    assert.deepEqual(await f.call("resume_goal", { expected_goal_id: "old" }), result);
+    assert.equal(f.writes(), 1);
+    assert.equal(f.permissions[0].agent, agent);
+    assert.deepEqual(f.permissions[0].resources, ["resume"]);
+    await assert.rejects(f.call("resume_goal", { expected_goal_id: "stale" }), /changed/);
+    assert.equal(f.writes(), 1);
+    assert.deepEqual(f.state(), result);
+  });
+  for (const name of ["create_goal", "replace_goal", "resume_goal"]) {
     test(`${agent}: host denial blocks ${name} before native access`, async () => {
       const f = await fixture(agent, null, true);
       await assert.rejects(f.call(name, { objective: "New", expected_goal_id: "old" }), /Host permission denied/);
@@ -82,9 +96,9 @@ for (const agent of ["build", "plan", "Plan"]) {
   }
 }
 
-for (const operation of ["create", "replace"]) {
+for (const operation of ["create", "replace", "resume"]) {
   test(`${operation}: owned ask preserves reason and adds operation once`, async () => {
-    const f = await fixture("build", operation === "replace" ? { id: "old", objective: "Old", status: "active" } : null);
+    const f = await fixture("build", operation === "create" ? null : { id: "old", objective: "Old", status: "paused" });
     await f.call(`${operation}_goal`, { objective: "New", expected_goal_id: "old" });
     const event = { ...f.permissions[0], effect: "ask", message: "Manual approval required" };
     const before = structuredClone(event);
