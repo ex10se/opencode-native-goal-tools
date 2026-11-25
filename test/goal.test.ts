@@ -5,6 +5,7 @@ import { createGoalTools, type Goal, type GoalPort } from "../src/goal.ts";
 function fixture(initial: Goal | null = null) {
   let state = initial;
   let writes = 0;
+  let resumes = 0;
   const port: GoalPort = {
     async get() { return state; },
     async create(_id, objective) {
@@ -13,14 +14,64 @@ function fixture(initial: Goal | null = null) {
       if (objective.startsWith('"') && objective.endsWith('"')) objective = objective.slice(1, -1).trim();
       state = { id: `goal-${writes}`, objective, status: "active" };
     },
+    async resume(_id) {
+      resumes++;
+      if (state?.status === "paused") state = { ...state, status: "active" };
+    },
   };
-  return { port, tools: createGoalTools(port), state: () => state, writes: () => writes };
+  return { port, tools: createGoalTools(port), state: () => state, writes: () => writes, resumes: () => resumes };
 }
 
 test("reads native state without writing", async () => {
   const f = fixture({ id: "existing", objective: "Ship", status: "paused" });
   assert.deepEqual(await f.tools.get("session"), f.state());
   assert.equal(f.writes(), 0);
+  assert.equal(f.resumes(), 0);
+});
+
+test("resumes the expected paused goal and preserves identity", async () => {
+  const initial: Goal = { id: "existing", objective: "Ship", status: "paused" };
+  const f = fixture(initial);
+  assert.deepEqual(await f.tools.resume("session", "build", "existing"), {
+    id: "existing", objective: "Ship", status: "active",
+  });
+  assert.equal(f.resumes(), 1);
+  assert.equal(f.state()?.objective, "Ship");
+  assert.equal(f.state()?.id, "existing");
+});
+
+test("resuming an already active goal returns it without a command", async () => {
+  const initial: Goal = { id: "existing", objective: "Ship", status: "active" };
+  const f = fixture(initial);
+  assert.deepEqual(await f.tools.resume("session", "build", "existing"), initial);
+  assert.equal(f.resumes(), 0);
+});
+
+for (const status of ["active", "paused", "complete"] as const) {
+  test(`resume refuses a stale expected ID without touching the goal (${status})`, async () => {
+    const initial: Goal = { id: "newer-id", objective: "Ship", status };
+    const f = fixture(initial);
+    await assert.rejects(f.tools.resume("session", "build", "stale-id"), /changed|expected/i);
+    assert.deepEqual(f.state(), initial);
+    assert.equal(f.resumes(), 0);
+  });
+}
+
+test("resume requires an existing goal, a nonempty expected ID, and never accepts complete", async () => {
+  const f = fixture();
+  await assert.rejects(f.tools.resume("session", "build", "missing"), /existing goal/i);
+  await assert.rejects(f.tools.resume("session", "build", ""), /expected.*id/i);
+  const done = fixture({ id: "done", objective: "Old", status: "complete" });
+  await assert.rejects(done.tools.resume("session", "build", "done"), /complete/i);
+  assert.equal(f.writes(), 0);
+  assert.equal(done.resumes(), 0);
+});
+
+test("resume reports the observed state after a failed native command, without retry", async () => {
+  const f = fixture({ id: "existing", objective: "Ship", status: "paused" });
+  f.port.resume = async () => { throw new Error("kickoff failed"); };
+  await assert.rejects(f.tools.resume("session", "build", "existing"), /kickoff failed.*Ship/s);
+  assert.equal(f.state()?.status, "paused");
 });
 
 test("creates and verifies a native goal, normalizing whitespace and quotes", async () => {
@@ -28,6 +79,15 @@ test("creates and verifies a native goal, normalizing whitespace and quotes", as
   const goal = await f.tools.create("session", "build", '  "Ship tests"  ');
   assert.deepEqual(goal, { id: "goal-1", objective: "Ship tests", status: "active" });
   assert.equal(f.writes(), 1);
+});
+
+test("does not write when native RPC is unavailable", async () => {
+  const f = fixture();
+  f.port.get = async () => { throw new Error("RPC unavailable"); };
+  await assert.rejects(f.tools.create("session", "build", "Ship"), /RPC unavailable/);
+  assert.equal(f.writes(), 0);
+  await assert.rejects(f.tools.resume("session", "build", "any"), /RPC unavailable/);
+  assert.equal(f.resumes(), 0);
 });
 
 test("concurrent duplicate requests create only one goal", async () => {

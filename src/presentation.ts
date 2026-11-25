@@ -11,6 +11,6 @@ export function goalOperationLabel(input: unknown): string {
       request.source?.type !== "tool" ||
       !Array.isArray(request.resources) || request.resources.length !== 1) return "";
   const operation = request.resources[0];
-  return operation === "create" || operation === "replace"
+  return operation === "create" || operation === "replace" || operation === "resume"
     ? `Goal operation: ${operation}` : "";
 }

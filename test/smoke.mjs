@@ -228,8 +228,10 @@ finally:
   if (permissionOnly) {
     const { readFile } = await import("node:fs/promises");
     const evidence = [];
-    for (const operation of ["create", "replace"]) {
-      actions = [{ name: `${operation}_goal`, args: { objective: "Must not be saved", expected_goal_id: "fixture-old" } }];
+    for (const operation of ["create", "replace", "resume"]) {
+      actions = [{ name: `${operation}_goal`, args: operation === "get"
+        ? {}
+        : { objective: "Must not be saved", expected_goal_id: "fixture-old" } }];
       await api(`/api/session/${id}/prompt`, { text: `SMOKE_CREATE: test isolated ${operation} permission rejection.` });
       await until(async () => {
         try {
@@ -287,9 +289,26 @@ finally:
   });
   assert(ids.length >= 3, "Expected create, get and idempotent create results");
   assert.deepEqual([...new Set(ids)], [saved.id], "Duplicate create replaced the goal");
+  actions = [{ name: "resume_goal", args: { expected_goal_id: saved.id } }];
+  toolResults = [];
   finishGoal = true;
-  await api(`/api/session/${id}/command`, { name: "goal", text: "resume" });
-  await until(async () => (await goal())?.status === "complete", "native completion");
+  await api(`/api/session/${id}/prompt`, { text: "SMOKE_CREATE: explicitly resume the paused goal." });
+  await until(async () => (await goal())?.status === "complete", "paused goal explicitly resumed to completion");
+  assert.equal((await goal()).id, saved.id);
+  assert.equal((await goal()).objective, objective);
+  const resumedStates = toolResults.flatMap(m => {
+    try {
+      const raw = typeof m.content === "string" ? m.content : m.content.map(p => p.text ?? "").join("");
+      return [JSON.parse(raw)];
+    } catch { return []; }
+  }).filter(g => g.id === saved.id);
+  assert(resumedStates.some(g => g.status === "active"), "Resume did not return the active native state");
+  actions = [{ name: "resume_goal", args: { expected_goal_id: saved.id } }];
+  toolResults = [];
+  await api(`/api/session/${id}/prompt`, { text: "SMOKE_CREATE: verify resume refusal for a completed goal." });
+  await until(() => toolResults.some(m => JSON.stringify(m.content).includes("complete")), "completed goal resume rejected");
+  assert.equal((await goal()).id, saved.id);
+  assert.equal((await goal()).status, "complete");
   assert.equal((await goal()).id, saved.id);
   actions = [{ name: "create_goal", args: { objective: "Different objective" } }];
   toolResults = [];
@@ -355,7 +374,7 @@ finally:
   assert.equal(await goal(plan.data.id), null);
   await api(`/api/session/${id}/command`, { name: "goal", text: "clear" });
   assert.equal(await goal(), null);
-  console.log(JSON.stringify({ result: "PASS", version: info.version, tools: requestedTools, nativeLifecycle: ["paused", "complete", "cleared"], duplicate: "same id", implicitReplacement: "rejected", explicitReplacement: "new native id", staleReplacement: "rejected", plan: { create: planSaved.status, replace: planCorrected.status, newID: true, readBack: true }, calls, artifacts: root }));
+  console.log(JSON.stringify({ result: "PASS", version: info.version, tools: requestedTools, nativeLifecycle: ["paused", "complete", "cleared"], duplicate: "same id", implicitReplacement: "rejected", explicitReplacement: "new native id", staleReplacement: "rejected", resume: { completedRefused: true, newID: false }, plan: { create: planSaved.status, replace: planCorrected.status, newID: true, readBack: true }, calls, artifacts: root }));
   }
 } finally {
   if (terminal) {

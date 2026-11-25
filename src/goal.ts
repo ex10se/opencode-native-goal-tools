@@ -8,6 +8,7 @@ export type Goal = {
 export interface GoalPort {
   get(sessionID: string): Promise<Goal | null>;
   create(sessionID: string, objective: string): Promise<void>;
+  resume(sessionID: string): Promise<void>;
 }
 
 export function createGoalTools(port: GoalPort) {
@@ -49,12 +50,36 @@ export function createGoalTools(port: GoalPort) {
       finally { if (pending.get(sessionID) === current) pending.delete(sessionID); }
   }
 
+  async function resumeGoal(sessionID: string, expectedID: string): Promise<Goal> {
+    if (!expectedID.trim()) throw new Error("A nonempty expected goal ID is required.");
+    const current = await port.get(sessionID);
+    if (!current) throw new Error("No existing goal to resume. Read get_goal and use create_goal instead.");
+    if (current.id !== expectedID) throw new Error("The existing goal changed. Read get_goal again before requesting resumption.");
+    if (current.status === "active") return current;
+    if (current.status === "complete") throw new Error("A completed goal cannot be resumed. Replace it explicitly with replace_goal instead.");
+    try {
+      await port.resume(sessionID);
+    } catch (error) {
+      let observed: unknown;
+      try { observed = await port.get(sessionID); }
+      catch { observed = "unavailable"; }
+      throw new Error(`Native goal command failed: ${String(error)}. Observed state: ${JSON.stringify(observed)}. Do not retry automatically.`);
+    }
+    const saved = await port.get(sessionID);
+    if (!saved || saved.id !== current.id || saved.objective !== current.objective || saved.status !== "active") {
+      throw new Error(`Could not verify the resumed native goal. Observed state: ${JSON.stringify(saved)}.`);
+    }
+    return saved;
+  }
+
   return {
     get: (sessionID: string) => port.get(sessionID),
     create: (sessionID: string, _agent: string, objective: string) =>
       serialized(sessionID, () => write(sessionID, objective)),
     replace: (sessionID: string, _agent: string, expectedID: string, objective: string) =>
       serialized(sessionID, () => write(sessionID, objective, expectedID)),
+    resume: (sessionID: string, _agent: string, expectedID: string) =>
+      serialized(sessionID, () => resumeGoal(sessionID, expectedID)),
   };
 }
 

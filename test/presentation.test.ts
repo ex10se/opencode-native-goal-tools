@@ -11,6 +11,7 @@ const request = (operation: string) => ({
 test("labels only the pending owned goal operation", () => {
   assert.equal(goalOperationLabel(request("create")), "Goal operation: create");
   assert.equal(goalOperationLabel(request("replace")), "Goal operation: replace");
+  assert.equal(goalOperationLabel(request("resume")), "Goal operation: resume");
 });
 
 test("clears the label when no request is pending and ignores foreign requests", () => {
